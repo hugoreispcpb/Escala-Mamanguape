@@ -4,9 +4,10 @@ import { ptBR } from 'date-fns/locale';
 
 interface ListViewProps {
   entries: ScheduleEntry[];
+  onRequestShift?: (entry: ScheduleEntry) => void;
 }
 
-export default function ListView({ entries }: ListViewProps) {
+export default function ListView({ entries, onRequestShift }: ListViewProps) {
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
       <table className="w-full">
@@ -15,6 +16,7 @@ export default function ListView({ entries }: ListViewProps) {
             <th className="px-6 py-3 text-left">Data</th>
             <th className="px-6 py-3 text-left">Horário</th>
             <th className="px-6 py-3 text-left">Profissionais</th>
+            {onRequestShift && <th className="px-6 py-3 text-left">Ações</th>}
           </tr>
         </thead>
         <tbody>
@@ -48,6 +50,16 @@ export default function ListView({ entries }: ListViewProps) {
                   ))}
                 </div>
               </td>
+              {onRequestShift && (
+                <td className="px-6 py-3">
+                  <button
+                    onClick={() => onRequestShift(entry)}
+                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition"
+                  >
+                    Solicitar
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
