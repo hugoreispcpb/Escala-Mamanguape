@@ -4,9 +4,10 @@ interface DayCardProps {
   day: number;
   entry?: ScheduleEntry;
   highlighted?: string;
+  opacity?: number;
 }
 
-export default function DayCard({ day, entry, highlighted }: DayCardProps) {
+export default function DayCard({ day, entry, highlighted, opacity = 1 }: DayCardProps) {
   if (!entry) {
     return (
       <div className="border-2 border-gray-300 rounded-lg p-3 min-h-[200px] bg-gray-50"></div>
@@ -14,7 +15,10 @@ export default function DayCard({ day, entry, highlighted }: DayCardProps) {
   }
 
   return (
-    <div className="border-2 border-gray-300 rounded-lg p-3 min-h-[200px] bg-white hover:shadow-md transition overflow-hidden">
+    <div 
+      className="border-2 border-gray-300 rounded-lg p-3 min-h-[200px] bg-white hover:shadow-md transition overflow-hidden"
+      style={{ opacity }}
+    >
       {/* Dia */}
       <div className="font-bold text-lg mb-2">DIA {day}</div>
 
