@@ -1,12 +1,18 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, List, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, List, LayoutGrid, FileText } from 'lucide-react';
 import { format, getDaysInMonth, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import DayCard from './DayCard';
 import ListView from './ListView';
 import FilterBar from './FilterBar';
+import ScheduleStats from './ScheduleStats';
+import ProfessionalFilter from './ProfessionalFilter';
+import NotificationCenter from './NotificationCenter';
+import ShiftRequest from './ShiftRequest';
+import { exportScheduleToPDF, exportScheduleToCSV } from './PDFExport';
 import { useScheduleStore } from '@/store/scheduleStore';
 import { mockScheduleData } from '@/data/mockSchedule';
+import { ScheduleEntry } from '@/types/Schedule';
 
 type ViewMode = 'calendar' | 'list';
 
@@ -14,6 +20,9 @@ export default function ScheduleCalendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date(2026, 6, 1));
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProfessional, setSelectedProfessional] = useState<string | null>(null);
+  const [shiftRequestOpen, setShiftRequestOpen] = useState(false);
+  const [selectedShift, setSelectedShift] = useState<ScheduleEntry | undefined>();
   const { entries, setEntries } = useScheduleStore();
 
   // Initialize with mock data
@@ -42,19 +51,57 @@ export default function ScheduleCalendar() {
       entry.date.getFullYear() === currentMonth.getFullYear()
   );
 
-  const filteredEntries = monthEntries.filter((entry) =>
-    entry.professionals.some((prof) =>
-      prof.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  let filteredEntries = monthEntries;
+
+  // Apply search filter
+  if (searchTerm) {
+    filteredEntries = filteredEntries.filter((entry) =>
+      entry.professionals.some((prof) =>
+        prof.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+  }
+
+  // Apply professional filter
+  if (selectedProfessional) {
+    filteredEntries = filteredEntries.filter((entry) =>
+      entry.professionals.some((prof) => prof.name === selectedProfessional)
+    );
+  }
 
   const handleDownloadPDF = () => {
-    // PDF download functionality will be added
-    console.log('Downloading PDF...');
+    exportScheduleToPDF(filteredEntries, currentMonth);
   };
+
+  const handleDownloadCSV = () => {
+    exportScheduleToCSV(filteredEntries);
+  };
+
+  const handleShiftRequest = (entry: ScheduleEntry) => {
+    setSelectedShift(entry);
+    setShiftRequestOpen(true);
+  };
+
+  const allProfessionals = Array.from(
+    new Set(entries.flatMap((e) => e.professionals.map((p) => p.name)))
+  );
 
   return (
     <div className="w-full space-y-6">
+      {/* Top Bar with Notifications */}
+      <div className="bg-white rounded-lg shadow-lg p-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Escala Mamanguape</h1>
+        <div className="flex items-center gap-4">
+          <NotificationCenter />
+        </div>
+      </div>
+
+      {/* Statistics */}
+      <ScheduleStats entries={filteredEntries} selectedProfessional={selectedProfessional} />
+
+      {/* Professional Filter */}
+      <ProfessionalFilter onProfessionalSelect={setSelectedProfessional} />
+
       {/* Header */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center justify-between mb-4">
@@ -101,13 +148,24 @@ export default function ScheduleCalendar() {
               <List size={20} />
             </button>
           </div>
-          <button
-            onClick={handleDownloadPDF}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-          >
-            <Download size={20} />
-            Download PDF
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium"
+              title="Download em PDF"
+            >
+              <Download size={18} />
+              PDF
+            </button>
+            <button
+              onClick={handleDownloadCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium"
+              title="Download em CSV"
+            >
+              <FileText size={18} />
+              CSV
+            </button>
+          </div>
         </div>
       </div>
 
@@ -116,7 +174,7 @@ export default function ScheduleCalendar() {
 
       {/* Content */}
       {viewMode === 'calendar' ? (
-        <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="bg-white rounded-lg shadow-lg p-6" id="schedule-to-print">
           {/* Days of week */}
           <div className="grid grid-cols-7 gap-2 mb-4">
             {['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map((day) => (
@@ -140,20 +198,39 @@ export default function ScheduleCalendar() {
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const entry = monthEntries.find((e) => e.day === day);
+              const isFiltered = filteredEntries.some((e) => e.day === day);
               return (
-                <DayCard
+                <div
                   key={day}
-                  day={day}
-                  entry={entry}
-                  highlighted={searchTerm}
-                />
+                  onClick={() => {
+                    if (entry && isFiltered) {
+                      handleShiftRequest(entry);
+                    }
+                  }}
+                  className={isFiltered && entry ? 'cursor-pointer' : ''}
+                >
+                  <DayCard
+                    day={day}
+                    entry={entry}
+                    highlighted={searchTerm}
+                    opacity={!isFiltered && filteredEntries.length > 0 ? 0.3 : 1}
+                  />
+                </div>
               );
             })}
           </div>
         </div>
       ) : (
-        <ListView entries={filteredEntries} />
+        <ListView entries={filteredEntries} onRequestShift={handleShiftRequest} />
       )}
+
+      {/* Shift Request Modal */}
+      <ShiftRequest
+        isOpen={shiftRequestOpen}
+        onClose={() => setShiftRequestOpen(false)}
+        selectedShift={selectedShift}
+        professionals={allProfessionals}
+      />
     </div>
   );
 }
